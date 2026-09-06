@@ -20,7 +20,7 @@ textarea{width:100%;min-height:170px;padding:12px;font:15px Georgia,serif;border
 <body>
 <h1>Unit 3, Day 3 — Current Event: Index Funds at 50</h1>
 <div class="subtitle">Read closely. Then answer 7 multiple-choice questions and one written response.</div>
-<div class="note"><strong>50 points total:</strong> Multiple choice = 35 points (5 each). Written response = 15 points. Your writing should be <strong>4–5 complete sentences</strong> and use evidence from the article plus at least two lesson vocabulary terms.</div>
+<div class="note"><strong>50 points total:</strong> Multiple choice = 35 points (5 each). Written response = 15 points. Your writing should be <strong>4–5 complete sentences</strong>, use evidence from the article, and correctly use <strong>at least 4 lesson vocabulary terms in context</strong>.</div>
 <div class="idbar"><label>Assigned Code Name:</label><input id="studentId" placeholder="e.g. Falcon217"><button onclick="loadState()">Load saved work</button><span id="status" class="save"></span></div>
 
 <h2>Read: From “Bogle’s Folly” to Trillions</h2>
@@ -56,7 +56,7 @@ textarea{width:100%;min-height:170px;padding:12px;font:15px Georgia,serif;border
 <h2>Written Response — 15 points</h2>
 <p><strong>Prompt:</strong> In 1976, critics questioned a fund that did not try to pick stocks that would beat the market. Fifty years later, index funds have become extremely popular. <strong>Why might an investor choose an index fund instead of trying to select individual winning investments? What is one limitation or tradeoff the investor should still understand?</strong></p>
 <button onclick="toggleRubric()">View / Hide Writing Rubric</button>
-<div id="rubric" class="rubric"><table><tr><th>Criteria</th><th>Points</th><th>What strong work does</th></tr><tr><td>Explanation</td><td>0–5</td><td>Clearly explains why an investor might choose an index fund.</td></tr><tr><td>Evidence + Vocabulary</td><td>0–5</td><td>Uses accurate article evidence and at least two lesson vocabulary terms.</td></tr><tr><td>Tradeoff + Completeness</td><td>0–5</td><td>Explains a real limitation/tradeoff and develops the response in about 4–5 complete sentences.</td></tr></table></div>
+<div id="rubric" class="rubric"><table><tr><th>Criteria</th><th>Points</th><th>What strong work does</th></tr><tr><td>Explanation &amp; Evidence</td><td>0–6</td><td>Explains why an investor might choose an index fund, uses an accurate article idea, and identifies a legitimate limitation or tradeoff.</td></tr><tr><td>Vocabulary in Context</td><td>0–6</td><td>Correctly uses at least 4 vocabulary terms in ways that demonstrate understanding.</td></tr><tr><td>Clarity &amp; Completion</td><td>0–3</td><td>Uses 4–5 complete, understandable sentences with a clear response.</td></tr></table></div>
 <p class="small">Write about 4–5 complete sentences. Type your own thinking; pasting is disabled.</p>
 
 <div class="vocab-requirement" style="margin:14px 0;padding:14px 16px;border:2px solid #d6a900;border-radius:10px;background:#fff9df;">
@@ -68,9 +68,18 @@ textarea{width:100%;min-height:170px;padding:12px;font:15px Georgia,serif;border
 <textarea id="writing" placeholder="Write your response here..."></textarea><div id="pasteWarning" class="warning">Pasting is disabled here. Type your own response.</div>
 <br><button id="coachBtn" onclick="getCoaching()">Get AI Coaching</button><div id="coach" class="feedback" style="display:none"></div>
 
-<h2>Submit</h2>
-<p>When you are satisfied with your answers, submit once for your final score. The writing will be graded using the rubric above.</p>
-<button class="primary" id="submitBtn" onclick="submitForGrade()">Submit for Final Grade</button>
+<h2>Finish &amp; Turn In</h2>
+<div class="note">
+  <strong>Complete these 3 steps:</strong>
+  <ol style="margin-bottom:0;">
+    <li><strong>Submit for feedback and your final score.</strong> The AI grades the response you submit. Revising after AI coaching is optional—you do not have to revise in order to be graded.</li>
+    <li><strong>Download your scored PDF.</strong> Your final score and writing feedback will appear at the top of the PDF.</li>
+    <li><strong>Upload the PDF to Google Classroom</strong> for this assignment, then click <strong>Turn in</strong>.</li>
+  </ol>
+</div>
+<button class="primary" id="submitBtn" onclick="submitForGrade()">1. Submit for Feedback &amp; Final Score</button>
+<button id="pdfBtn" onclick="downloadPdf()" disabled>2. Download Scored PDF</button>
+<p class="small"><strong>3.</strong> Open this assignment in Google Classroom → Add or create → File → upload the PDF → Turn in.</p>
 <div id="finalScore"></div>
 
 <script>
@@ -96,9 +105,48 @@ async function getCoaching(){let w=document.getElementById('writing').value.trim
 function state(){return{mcAnswers:answers(),writing:document.getElementById('writing').value,coachAttempts}}
 let timer;function scheduleSave(){clearTimeout(timer);timer=setTimeout(saveState,2500)}
 async function saveState(){let d=await backend('save_state',state());if(d&&d.saved)document.getElementById('status').textContent='Saved '+new Date().toLocaleTimeString()}
-async function loadState(){let d=await backend('load_state');if(!d||!d.found){document.getElementById('status').textContent='No saved work found.';return}document.getElementById('writing').value=d.writing||'';coachAttempts=d.coachAttempts||0;let a=d.mcAnswers||{};Object.keys(a).forEach(k=>{if(a[k]!==null&&a[k]!==undefined){let e=document.querySelector(`input[name="${k}"][value="${a[k]}"]`);if(e)e.checked=true}});document.getElementById('status').textContent='Saved work loaded.'}
+async function loadState(){let d=await backend('load_state');if(!d||!d.found){document.getElementById('status').textContent='No saved work found.';return}document.getElementById('writing').value=d.writing||'';coachAttempts=d.coachAttempts||0;let a=d.mcAnswers||{};Object.keys(a).forEach(k=>{if(a[k]!==null&&a[k]!==undefined){let e=document.querySelector(`input[name="${k}"][value="${a[k]}"]`);if(e)e.checked=true}});document.getElementById('status').textContent='Saved work loaded.';if(d.submitted){document.getElementById('pdfBtn').disabled=false;document.getElementById('finalScore').innerHTML=`<div class="score"><strong>Already submitted.</strong> Final score: ${d.totalScore}/50. You may download your scored PDF below.</div>`;}}
 document.addEventListener('change',e=>{if(e.target.matches('input[type=radio]'))scheduleSave()});document.getElementById('writing').addEventListener('input',scheduleSave);document.getElementById('writing').addEventListener('paste',e=>{e.preventDefault();let w=document.getElementById('pasteWarning');w.style.display='block';setTimeout(()=>w.style.display='none',2500)});
-async function submitForGrade(){let a=answers(),missing=Object.values(a).filter(v=>v===null).length,w=document.getElementById('writing').value.trim();if(missing){alert('Answer all 7 multiple-choice questions first.');return}if(w.length<100){alert('Your written response is too short. Aim for 4–5 complete sentences.');return}if(!confirm('Submit for your FINAL grade? You should submit only when you are finished revising.'))return;let b=document.getElementById('submitBtn');b.disabled=true;b.textContent='Grading...';let d=await backend('grade',{mcAnswers:a,writing:w,coachAttempts});b.disabled=false;b.textContent='Submit for Final Grade';if(!d)return;let f=document.getElementById('finalScore');if(d.alreadySubmitted){f.innerHTML=`<div class="score"><strong>Already submitted.</strong> Final score: ${d.totalScore}/50.</div>`;return}f.innerHTML=`<div class="score"><strong>Final Score: ${d.totalScore}/50</strong><br>Multiple Choice: ${d.mcScore}/35<br>Writing: ${d.writingScore}/15<br><br><strong>Writing feedback:</strong><br>${escapeHtml(d.feedback||'')}</div>`;document.querySelectorAll('input,textarea').forEach(x=>x.disabled=true);b.disabled=true}
+async function submitForGrade(){
+  let a=answers(),missing=Object.values(a).filter(v=>v===null).length,w=document.getElementById('writing').value.trim();
+  if(missing){alert('Answer all 7 multiple-choice questions first.');return}
+  if(w.length<100){alert('Your written response is too short. Aim for 4–5 complete sentences.');return}
+  if(!confirm('Submit this work for feedback and your final score? The response you have now will be graded.'))return;
+
+  let b=document.getElementById('submitBtn');
+  b.disabled=true;b.textContent='Grading...';
+  let d=await backend('grade',{mcAnswers:a,writing:w,coachAttempts});
+  b.textContent='1. Submit for Feedback & Final Score';
+  if(!d){b.disabled=false;return}
+  if(d.error){alert(d.error);b.disabled=false;return}
+
+  let f=document.getElementById('finalScore');
+  f.innerHTML=`<div class="score"><strong>Final Score: ${d.totalScore}/50</strong><br>Multiple Choice: ${d.mcScore}/35<br>Writing: ${d.writingScore}/15<br><br><strong>Writing feedback:</strong><br>${escapeHtml(d.feedback||'')}</div>`;
+  document.querySelectorAll('input,textarea').forEach(x=>x.disabled=true);
+  b.disabled=true;
+  document.getElementById('pdfBtn').disabled=false;
+}
+
+async function downloadPdf(){
+  let btn=document.getElementById('pdfBtn');
+  btn.disabled=true;btn.textContent='Building PDF...';
+  let d=await backend('create_pdf',{});
+  btn.textContent='2. Download Scored PDF';
+  btn.disabled=false;
+  if(!d)return;
+  if(d.error){alert(d.error);return}
+
+  const binary=atob(d.base64);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  const blob=new Blob([bytes],{type:d.mimeType||'application/pdf'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=d.filename||'U3D3_Funds_Scored.pdf';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
 function escapeHtml(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 </script>
 </body></html>
