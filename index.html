@@ -16,7 +16,6 @@ button{padding:9px 14px;border:1px solid var(--navy);background:white;color:var(
 textarea{width:100%;min-height:170px;padding:12px;font:15px Georgia,serif;border:1px solid #bbb;border-radius:5px}.small{font:13px Arial,sans-serif;color:#666}.warning{font:13px Arial,sans-serif;color:#9b3e32;display:none}.feedback{white-space:pre-wrap}.score{font-size:1.05rem;padding:16px;border-left:6px solid var(--gold);background:#fbf6e9;margin:16px 0}.rubric{display:none}.rubric table{width:100%;border-collapse:collapse;background:white}.rubric th,.rubric td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}.rubric th{background:#e5ebf3}.save{font:12px Arial,sans-serif;color:#777}
 @media(max-width:650px){body{padding:12px}.article{padding:14px}.term[data-def]:hover:after{display:none}}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <h1>Unit 3, Day 3 — Current Event: Index Funds at 50</h1>
@@ -79,7 +78,7 @@ textarea{width:100%;min-height:170px;padding:12px;font:15px Georgia,serif;border
   </ol>
 </div>
 <button class="primary" id="submitBtn" onclick="submitForGrade()">1. Submit for Feedback &amp; Final Score</button>
-<button id="pdfBtn" onclick="downloadPdf()" disabled>2. Download Scored PDF</button>
+<a id="pdfBtn" class="button-disabled" aria-disabled="true">2. Download Scored PDF</a>
 <p class="small"><strong>3.</strong> Open this assignment in Google Classroom → Add or create → File → upload the PDF → Turn in.</p>
 <div id="finalScore"></div>
 
@@ -101,12 +100,19 @@ function toggleRubric(){let r=document.getElementById('rubric');r.style.display=
 function answers(){let o={};MC.forEach(x=>{let e=document.querySelector(`input[name="${x.id}"]:checked`);o[x.id]=e?Number(e.value):null});return o}
 function checkMC(){let n=Object.values(answers()).filter(v=>v!==null).length;document.getElementById('mcResult').textContent=n===7?'All 7 answered. Review your choices, then continue.':`${n}/7 answered. Finish all seven before submitting.`;scheduleSave()}
 async function backend(action,extra={}){let id=document.getElementById('studentId').value.trim();if(!id){alert('Enter your assigned code name first.');return null}if(APPS_SCRIPT_URL.includes('PASTE_YOUR')){alert('Teacher setup needed: paste the deployed Apps Script web app URL into the HTML.');return null}try{let r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...extra,secret:SHARED_SECRET,action,studentId:id})});return await r.json()}catch(e){alert('Could not reach the assignment server. Try again.');return null}}
-let coachAttempts=0;
+let coachAttempts=0,pdfData=null;
 async function getCoaching(){let w=document.getElementById('writing').value.trim();if(w.length<80){alert('Write a meaningful first attempt before asking for coaching.');return}if(coachAttempts>=2){document.getElementById('coach').style.display='block';document.getElementById('coach').textContent='You have used both coaching checks. Revise using the feedback you already received.';return}coachAttempts++;let p=document.getElementById('coach');p.style.display='block';p.textContent='Reading your response...';let d=await backend('coach',{writing:w,attemptNumber:coachAttempts});p.textContent=d&&d.reply?d.reply:'Coaching is unavailable right now.';scheduleSave()}
 function state(){return{mcAnswers:answers(),writing:document.getElementById('writing').value,coachAttempts}}
 let timer;function scheduleSave(){clearTimeout(timer);timer=setTimeout(saveState,2500)}
 async function saveState(){let d=await backend('save_state',state());if(d&&d.saved)document.getElementById('status').textContent='Saved '+new Date().toLocaleTimeString()}
-async function loadState(){let d=await backend('load_state');if(!d||!d.found){document.getElementById('status').textContent='No saved work found.';return}document.getElementById('writing').value=d.writing||'';coachAttempts=d.coachAttempts||0;let a=d.mcAnswers||{};Object.keys(a).forEach(k=>{if(a[k]!==null&&a[k]!==undefined){let e=document.querySelector(`input[name="${k}"][value="${a[k]}"]`);if(e)e.checked=true}});document.getElementById('status').textContent='Saved work loaded.';if(d.submitted){document.getElementById('pdfBtn').disabled=false;document.getElementById('finalScore').innerHTML=`<div class="score"><strong>Already submitted.</strong> Final score: ${d.totalScore}/50. You may download your scored PDF below.</div>`;}}
+async function loadState(){
+  let d=await backend('load_state');
+  if(!d||!d.found){document.getElementById('status').textContent='No saved work found.';return}
+  document.getElementById('writing').value=d.writing||'';coachAttempts=d.coachAttempts||0;
+  let a=d.mcAnswers||{};Object.keys(a).forEach(k=>{if(a[k]!==null&&a[k]!==undefined){let el=document.querySelector(`input[name="${k}"][value="${a[k]}"]`);if(el)el.checked=true}});
+  document.getElementById('status').textContent='Saved work loaded.';
+  if(d.submitted){pdfData=d;preparePdfDownload(pdfData);document.getElementById('finalScore').innerHTML=`<div class="score"><strong>Already submitted.</strong> Final score: ${d.totalScore}/50. You may download your scored PDF below.</div>`;}
+}
 document.addEventListener('change',e=>{if(e.target.matches('input[type=radio]'))scheduleSave()});document.getElementById('writing').addEventListener('input',scheduleSave);document.getElementById('writing').addEventListener('paste',e=>{e.preventDefault();let w=document.getElementById('pasteWarning');w.style.display='block';setTimeout(()=>w.style.display='none',2500)});
 async function submitForGrade(){
   let a=answers(),missing=Object.values(a).filter(v=>v===null).length,w=document.getElementById('writing').value.trim();
@@ -125,84 +131,48 @@ async function submitForGrade(){
   f.innerHTML=`<div class="score"><strong>Final Score: ${d.totalScore}/50</strong><br>Multiple Choice: ${d.mcScore}/35<br>Writing: ${d.writingScore}/15<br><br><strong>Writing feedback:</strong><br>${escapeHtml(d.feedback||'')}</div>`;
   document.querySelectorAll('input,textarea').forEach(x=>x.disabled=true);
   b.disabled=true;
-  document.getElementById('pdfBtn').disabled=false;
+  pdfData={...d,codeName:document.getElementById('studentId').value.trim(),writing:w,mcAnswers:a};
+  preparePdfDownload(pdfData);
 }
 
-async function downloadPdf(){
-  let btn=document.getElementById('pdfBtn');
-  btn.disabled=true;btn.textContent='Building PDF...';
-  let d=await backend('create_pdf',{});
-  btn.textContent='2. Download Scored PDF';
-  btn.disabled=false;
+let pdfObjectUrl=null;
+function preparePdfDownload(d){
   if(!d)return;
-  if(d.error){alert(d.error);return}
+  if(pdfObjectUrl)URL.revokeObjectURL(pdfObjectUrl);
+  const L=[],add=(x='')=>L.push(String(x)),r=d.writingRubric||{};
+  add('UNIT 3 - INVESTING | DAY 3: FUNDS');add('Current Event: From "Bogle\'s Folly" to Trillions');add('');
+  add(`FINAL SCORE: ${d.totalScore}/50`);add(`Multiple Choice: ${d.mcScore}/35     Writing: ${d.writingScore}/15`);add('');
+  add('WRITING FEEDBACK');add(d.feedback||'No written feedback was returned.');add('');
+  add('WRITING RUBRIC');add(`Explanation & Evidence: ${r.explanationEvidence||0}/6`);add(`Vocabulary in Context: ${r.vocabulary||0}/6`);add(`Clarity & Completion: ${r.clarity||0}/3`);
+  if(r.vocabUsed&&r.vocabUsed.length)add('Vocabulary recognized in context: '+r.vocabUsed.join(', '));
+  if(r.vocabNote)add('Vocabulary note: '+r.vocabNote);
+  add('');add('STUDENT CODE NAME');add(d.codeName||document.getElementById('studentId').value.trim());add('');
+  add('WRITTEN RESPONSE');add(d.writing||document.getElementById('writing').value||'');add('');
+  add('MULTIPLE-CHOICE RESPONSES');const aa=d.mcAnswers||answers();
+  Object.keys(aa).sort().forEach(k=>{const v=aa[k];add(`${k.toUpperCase()}: ${(v===null||v===undefined)?'-':String.fromCharCode(65+Number(v))}`)});
+  add('');add('GOOGLE CLASSROOM SUBMISSION');add('Upload this PDF to the assignment in Google Classroom, then click Turn in.');
 
-  try{
-    const {jsPDF}=window.jspdf;
-    const pdf=new jsPDF({unit:'pt',format:'letter'});
-    const left=54, right=558, width=right-left;
-    let y=55;
-
-    function heading(text,size=15){
-      pdf.setFont('helvetica','bold');pdf.setFontSize(size);
-      const lines=pdf.splitTextToSize(String(text),width);
-      ensure(lines.length*(size+3)+12);
-      pdf.text(lines,left,y);y+=lines.length*(size+3)+10;
-    }
-    function body(text,size=10,bold=false){
-      pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);
-      const lines=pdf.splitTextToSize(String(text||''),width);
-      ensure(lines.length*(size+4)+8);
-      pdf.text(lines,left,y);y+=lines.length*(size+4)+7;
-    }
-    function ensure(needed){
-      if(y+needed>735){pdf.addPage();y=55;}
-    }
-
-    heading('Unit 3 – Investing | Day 3: Funds',16);
-    body('Current Event: From “Bogle’s Folly” to Trillions',11,true);
-    y+=5;
-
-    heading(`FINAL SCORE: ${d.totalScore}/50`,18);
-    body(`Multiple Choice: ${d.mcScore}/35     Writing: ${d.writingScore}/15`,11,true);
-
-    heading('Writing Feedback',13);
-    body(d.feedback||'No written feedback was returned.');
-
-    heading('Writing Rubric',13);
-    const r=d.writingRubric||{};
-    body(`Explanation & Evidence: ${r.explanationEvidence||0}/6`);
-    body(`Vocabulary in Context: ${r.vocabulary||0}/6`);
-    body(`Clarity & Completion: ${r.clarity||0}/3`);
-    if(r.vocabUsed&&r.vocabUsed.length)body('Vocabulary recognized in context: '+r.vocabUsed.join(', '));
-    if(r.vocabNote)body('Vocabulary note: '+r.vocabNote);
-
-    y+=5;
-    heading('Student Code Name',13);
-    body(d.codeName||studentId);
-
-    heading('Written Response',13);
-    body(d.writing||'');
-
-    heading('Multiple-Choice Responses',13);
-    const answers=d.mcAnswers||{};
-    Object.keys(answers).sort().forEach(k=>{
-      const v=answers[k];
-      const letter=(v===null||v===undefined)?'—':String.fromCharCode(65+Number(v));
-      body(`${k.toUpperCase()}: ${letter}`);
-    });
-
-    heading('Google Classroom Submission',13);
-    body('Upload this PDF to the assignment in Google Classroom, then click Turn in.');
-
-    const safeName=String(d.codeName||studentId||'Student').replace(/[^a-z0-9_-]/gi,'_');
-    pdf.save(`U3D3_Funds_${safeName}.pdf`);
-  }catch(err){
-    console.error(err);
-    alert('The PDF could not be created in this browser. Please tell your teacher.');
-  }
+  const blob=makeSimplePdf(L);
+  pdfObjectUrl=URL.createObjectURL(blob);
+  const a=document.getElementById('pdfBtn');
+  const name=String(d.codeName||document.getElementById('studentId').value.trim()||'Student').replace(/[^a-z0-9_-]/gi,'_');
+  a.href=pdfObjectUrl;
+  a.download=`U3D3_Funds_${name}.pdf`;
+  a.classList.remove('button-disabled');
+  a.classList.add('ready');
+  a.setAttribute('aria-disabled','false');
+  a.textContent='2. Download Scored PDF';
 }
-
+function makeSimplePdf(raw){
+  const clean=s=>String(s||'').replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[–—]/g,'-').replace(/•/g,'-').replace(/[^\x20-\x7E]/g,' ');
+  const esc=s=>clean(s).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+  const wrap=(t,m=88)=>{let a=[],l='';clean(t).split(/\s+/).forEach(w=>{let z=l?l+' '+w:w;if(z.length>m&&l){a.push(l);l=w}else l=z});if(l)a.push(l);return a.length?a:['']};
+  let lines=[];raw.forEach(x=>x===''?lines.push(''):wrap(x).forEach(y=>lines.push(y)));let pages=[];for(let i=0;i<lines.length;i+=48)pages.push(lines.slice(i,i+48));
+  let o=[null],add=s=>{o.push(s);return o.length-1},font=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'),pids=[],cids=[];
+  pages.forEach(p=>{let st='BT\n/F1 10 Tf\n54 738 Td\n14 TL\n';p.forEach((x,i)=>{if(i)st+='T*\n';st+=`(${esc(x)}) Tj\n`});st+='ET';cids.push(add(`<< /Length ${st.length} >>\nstream\n${st}\nendstream`));pids.push(add('P'))});
+  let ps=add('PS');pids.forEach((id,i)=>o[id]=`<< /Type /Page /Parent ${ps} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${cids[i]} 0 R >>`);o[ps]=`<< /Type /Pages /Kids [${pids.map(x=>x+' 0 R').join(' ')}] /Count ${pids.length} >>`;let cat=add(`<< /Type /Catalog /Pages ${ps} 0 R >>`);
+  let pdf='%PDF-1.4\n',off=[0];for(let i=1;i<o.length;i++){off[i]=pdf.length;pdf+=`${i} 0 obj\n${o[i]}\nendobj\n`}let xr=pdf.length;pdf+=`xref\n0 ${o.length}\n0000000000 65535 f \n`;for(let i=1;i<o.length;i++)pdf+=String(off[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${o.length} /Root ${cat} 0 R >>\nstartxref\n${xr}\n%%EOF`;return new Blob([new TextEncoder().encode(pdf)],{type:'application/pdf'});
+}
 function escapeHtml(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 </script>
 </body></html>
