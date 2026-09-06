@@ -16,6 +16,7 @@ button{padding:9px 14px;border:1px solid var(--navy);background:white;color:var(
 textarea{width:100%;min-height:170px;padding:12px;font:15px Georgia,serif;border:1px solid #bbb;border-radius:5px}.small{font:13px Arial,sans-serif;color:#666}.warning{font:13px Arial,sans-serif;color:#9b3e32;display:none}.feedback{white-space:pre-wrap}.score{font-size:1.05rem;padding:16px;border-left:6px solid var(--gold);background:#fbf6e9;margin:16px 0}.rubric{display:none}.rubric table{width:100%;border-collapse:collapse;background:white}.rubric th,.rubric td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}.rubric th{background:#e5ebf3}.save{font:12px Arial,sans-serif;color:#777}
 @media(max-width:650px){body{padding:12px}.article{padding:14px}.term[data-def]:hover:after{display:none}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <h1>Unit 3, Day 3 — Current Event: Index Funds at 50</h1>
@@ -136,15 +137,70 @@ async function downloadPdf(){
   if(!d)return;
   if(d.error){alert(d.error);return}
 
-  const binary=atob(d.base64);
-  const bytes=new Uint8Array(binary.length);
-  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-  const blob=new Blob([bytes],{type:d.mimeType||'application/pdf'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download=d.filename||'U3D3_Funds_Scored.pdf';
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  try{
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({unit:'pt',format:'letter'});
+    const left=54, right=558, width=right-left;
+    let y=55;
+
+    function heading(text,size=15){
+      pdf.setFont('helvetica','bold');pdf.setFontSize(size);
+      const lines=pdf.splitTextToSize(String(text),width);
+      ensure(lines.length*(size+3)+12);
+      pdf.text(lines,left,y);y+=lines.length*(size+3)+10;
+    }
+    function body(text,size=10,bold=false){
+      pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);
+      const lines=pdf.splitTextToSize(String(text||''),width);
+      ensure(lines.length*(size+4)+8);
+      pdf.text(lines,left,y);y+=lines.length*(size+4)+7;
+    }
+    function ensure(needed){
+      if(y+needed>735){pdf.addPage();y=55;}
+    }
+
+    heading('Unit 3 – Investing | Day 3: Funds',16);
+    body('Current Event: From “Bogle’s Folly” to Trillions',11,true);
+    y+=5;
+
+    heading(`FINAL SCORE: ${d.totalScore}/50`,18);
+    body(`Multiple Choice: ${d.mcScore}/35     Writing: ${d.writingScore}/15`,11,true);
+
+    heading('Writing Feedback',13);
+    body(d.feedback||'No written feedback was returned.');
+
+    heading('Writing Rubric',13);
+    const r=d.writingRubric||{};
+    body(`Explanation & Evidence: ${r.explanationEvidence||0}/6`);
+    body(`Vocabulary in Context: ${r.vocabulary||0}/6`);
+    body(`Clarity & Completion: ${r.clarity||0}/3`);
+    if(r.vocabUsed&&r.vocabUsed.length)body('Vocabulary recognized in context: '+r.vocabUsed.join(', '));
+    if(r.vocabNote)body('Vocabulary note: '+r.vocabNote);
+
+    y+=5;
+    heading('Student Code Name',13);
+    body(d.codeName||studentId);
+
+    heading('Written Response',13);
+    body(d.writing||'');
+
+    heading('Multiple-Choice Responses',13);
+    const answers=d.mcAnswers||{};
+    Object.keys(answers).sort().forEach(k=>{
+      const v=answers[k];
+      const letter=(v===null||v===undefined)?'—':String.fromCharCode(65+Number(v));
+      body(`${k.toUpperCase()}: ${letter}`);
+    });
+
+    heading('Google Classroom Submission',13);
+    body('Upload this PDF to the assignment in Google Classroom, then click Turn in.');
+
+    const safeName=String(d.codeName||studentId||'Student').replace(/[^a-z0-9_-]/gi,'_');
+    pdf.save(`U3D3_Funds_${safeName}.pdf`);
+  }catch(err){
+    console.error(err);
+    alert('The PDF could not be created in this browser. Please tell your teacher.');
+  }
 }
 
 function escapeHtml(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
